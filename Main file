@@ -1,0 +1,214 @@
+import pandas as pd
+import numpy as np
+import math
+import time
+import concurrent.futures
+import os
+
+import coords as co
+import displ as di
+import vel as ve
+import accel as ac
+import kinetic as ki
+import works as wo
+import mean as me
+import save as sa
+import msd as msd
+
+path = 'C:/Users/1/Desktop/раздаточные материалы/900/Rez/'
+
+path_to_read_x = str(path + 'X1000.txt')
+path_to_read_y = str(path + 'Y1000.txt')
+
+path_to_save_x = str(path + 'coordX.xlsx')
+path_to_save_y = str(path + 'coordY.xlsx')
+
+path_to_save_dx = str(path + 'displacementX.xlsx')
+path_to_save_dy = str(path + 'displacementY.xlsx')
+path_to_save_2dd = str(path + 'displ_2D.xlsx')
+
+path_to_save_vx = str(path + 'velocityX.xlsx')
+path_to_save_vy = str(path + 'velocityY.xlsx')
+path_to_save_2dv = str(path + 'vel_2D.xlsx')
+
+path_to_save_ax = str(path + 'accelerationX.xlsx')
+path_to_save_ay = str(path + 'accelerationY.xlsx')
+path_to_save_2da = str(path + 'acc_2D.xlsx')
+
+path_to_save_ke = str(path + 'kin_ens.xlsx')
+path_to_save_we = str(path + 'mal.xlsx')
+
+path_to_save_me = str(path + 'mean.xlsx')
+
+path_to_save_msdx = str(path + 'msdx.xlsx')
+path_to_save_msdy = str(path + 'msdy.xlsx')
+path_to_save_msd = str(path + 'msd.xlsx')
+
+path_to_save_workxj = str(path + 'workxj.xlsx')
+path_to_save_workyj = str(path + 'workyj.xlsx')
+
+if __name__ == "__main__":
+
+    start_time = time.time()
+
+    # Physical parameters and constants
+    particle_density = 1.5  # [g/cm^3] MF
+    coating_density = 6.31  # [g/cm^3] CuO
+
+# Parameters of our experimental setup
+    fps = 200  # Frames per 1 second
+    scale = 0.0009736  # Scale of our recording, [cm/px]
+    w = 1  # Coverage rate
+    diameter = 5.20  # Diameter of uncoated particle, [mkm]
+    dc = 0.15  # Thickness of coating, [mkm]
+
+# Calculation of particle parameters
+    Rp = diameter/2
+    Volume_particle = 4/3*math.pi*Rp**3  # [mkm^3]
+    Volume_coating = 4/3*w*math.pi*((Rp+dc)**3-Rp**3)  # [mkm^3]
+    Volume_particle /= 10**12  # [cm^3]
+    Volume_coating /= 10**12  # [cm^3]
+    Mass = particle_density*Volume_particle + coating_density*Volume_coating  # [g]
+    Mass /= 1000  # [kg]
+
+# Save particle parameters
+    exp_set = pd.DataFrame(data=0, index=range(8), columns=range(1), dtype=np.float64)
+    exp_set.iat[0, 0] = 'Масса частицы, кг'
+    exp_set.iat[1, 0] = Mass
+    exp_set.iat[2, 0] = 'Объём частицы, м^3'
+    exp_set.iat[3, 0] = Volume_particle/10**6
+    exp_set.iat[4, 0] = 'Объём покрытия, м^3'
+    exp_set.iat[5, 0] = Volume_coating/10**6
+    exp_set.iat[6, 0] = 'Объём частицы с покрытием, м^3'
+    exp_set.iat[7, 0] = (Volume_coating + Volume_coating)/10**6
+
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_loadx = executor.submit(co.load_coord, path_to_read_x)
+        fut_loady = executor.submit(co.load_coord, path_to_read_y)
+        coordsx = fut_loadx.result()
+        coordsy = fut_loady.result()
+
+# number of particles
+    colx = len(coordsx.columns)
+    coly = len(coordsy.columns)
+# number of frames
+    indx = len(coordsx.index)
+    indy = len(coordsy.index)
+
+# dislp
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_displx = executor.submit(di.calculate_displacement, coordsx, scale)
+        fut_disply = executor.submit(di.calculate_displacement, coordsy, scale)
+        displx = fut_displx.result()
+        disply = fut_disply.result()
+
+# msd
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_msdx = executor.submit(msd.calculate_msd, coordsx, indx, colx, scale, fps)
+        fut_msdy = executor.submit(msd.calculate_msd, coordsy, indy, coly, scale, fps)
+        msdx = fut_msdx.result()
+        msdy = fut_msdy.result()
+
+# vel
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_velx = executor.submit(ve.calculate_velocity, displx, indx, colx, fps)
+        fut_vely = executor.submit(ve.calculate_velocity, disply, indy, coly, fps)
+        velx = fut_velx.result()
+        vely = fut_vely.result()
+
+# accel
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_accx = executor.submit(ac.calculate_acceleration, velx, indx, colx, fps)
+        fut_accy = executor.submit(ac.calculate_acceleration, vely, indy, coly, fps)
+        accx = fut_accx.result()
+        accy = fut_accy.result()
+
+
+# works
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_workxj = executor.submit(wo.calculate_work, accx, displx, 1, indx, Mass)
+        fut_workyj = executor.submit(wo.calculate_work, accy, disply, 1, indy, Mass)
+        fut_workxev = executor.submit(wo.calculate_work, accx, displx, 2, indx, Mass)
+        fut_workyev = executor.submit(wo.calculate_work, accy, disply, 2, indy, Mass)
+        workxj = fut_workxj.result()
+        workyj = fut_workyj.result()
+        workxev = fut_workxev.result()
+        workyev = fut_workyev.result()
+
+# 2D
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_displ2d = executor.submit(di.calculate_displacement_2d, displx, disply)
+        fut_vel2d = executor.submit(ve.calculate_velocity_2d, velx, vely, indx, colx)
+        fut_acc2d = executor.submit(ac.calculate_acceleration_2d, accx, accy, indx, colx)
+        fut_work2dj = executor.submit(wo.calculate_work_2d, workxj, workyj)
+        fut_work2dev = executor.submit(wo.calculate_work_2d, workxev, workyev)
+        fut_msd2d = executor.submit(msd.calculate_msd_2d, msdx, msdy, indx, fps)
+        displ_2d = fut_displ2d.result()
+        vel_2d = fut_vel2d.result()
+        acc_2d = fut_acc2d.result()
+        work_2dj = fut_work2dj.result()
+        work_2dev = fut_work2dev.result()
+        msd_2d = fut_msd2d.result()
+
+# kinetic
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_kinetj = executor.submit(ki.calculate_kin_en, vel_2d, 1, indx, colx, Mass)
+        fut_kinetev = executor.submit(ki.calculate_kin_en, vel_2d, 2, indx, colx, Mass)
+        kinetj = fut_kinetj.result()
+        kinetev = fut_kinetev.result()
+
+# mean
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_mean_displ = executor.submit(me.calc_mean, displ_2d)
+        fut_mean_vel = executor.submit(me.calc_mean, vel_2d)
+        fut_mean_acc = executor.submit(me.calc_mean, acc_2d)
+        fut_mean_kin_en_j = executor.submit(me.calc_mean, kinetj)
+        fut_mean_kin_en_ev = executor.submit(me.calc_mean, kinetev)
+        fut_mean_work_j = executor.submit(me.calc_mean, work_2dj)
+        fut_mean_work_ev = executor.submit(me.calc_mean, work_2dev)
+        mean_displ = fut_mean_displ.result()
+        mean_vel = fut_mean_vel.result()
+        mean_acc = fut_mean_acc.result()
+        mean_kin_en_j = fut_mean_kin_en_j.result()
+        mean_kin_en_ev = fut_mean_kin_en_ev.result()
+        mean_work_j = fut_mean_work_j.result()
+        mean_work_ev = fut_mean_work_ev.result()
+
+# Save displacement for both axes
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        fut_save_x = executor.submit(sa.save_data, coordsx, path_to_save_x, 'Sheet1', '%.6f')
+        fut_save_y = executor.submit(sa.save_data, coordsy, path_to_save_y, 'Sheet1', '%.6f')
+        fut_save_dx = executor.submit(sa.save_data, displx, path_to_save_dx, 'Sheet1', '%.7f')
+        fut_save_dy = executor.submit(sa.save_data, disply, path_to_save_dy, 'Sheet1', '%.7f')
+        fut_save_vx = executor.submit(sa.save_data, velx, path_to_save_vx, 'Sheet1', '%.8f')
+        fut_save_vy = executor.submit(sa.save_data, vely, path_to_save_vy, 'Sheet1', '%.8f')
+        fut_save_ax = executor.submit(sa.save_data, accx, path_to_save_ax, 'Sheet1', '%.9f')
+        fut_save_ay = executor.submit(sa.save_data, accy, path_to_save_ay, 'Sheet1', '%.9f')
+        fut_save_2dd = executor.submit(sa.save_data, displ_2d, path_to_save_2dd, 'Sheet1', '%.7f')
+        fut_save_2dv = executor.submit(sa.save_data, vel_2d, path_to_save_2dv, 'Sheet1', '%.8f')
+        fut_save_2da = executor.submit(sa.save_data, acc_2d, path_to_save_2da, 'Sheet1', '%.9f')
+        fut_workxj = executor.submit(sa.save_data, workxj, path_to_save_workxj, 'Sheet1', '%.30f')
+        fut_workyj = executor.submit(sa.save_data, workyj, path_to_save_workyj, 'Sheet1', '%.30f')
+        fut_save_msdx = executor.submit(sa.save_data, msdx, path_to_save_msdx, 'Sheet1', '%.20f')
+        fut_save_msdy = executor.submit(sa.save_data, msdy, path_to_save_msdy, 'Sheet1', '%.20f')
+        fut_save_2dmsd = executor.submit(sa.save_data, msd_2d, path_to_save_msd, 'Sheet1', '%.20f')
+
+    with pd.ExcelWriter(path_to_save_ke) as writer:
+        kinetj.to_excel(excel_writer=writer, sheet_name='Kin en J', index=False, header=False)
+        kinetev.to_excel(excel_writer=writer, sheet_name='Kin en eV', index=False, header=False)
+
+    with pd.ExcelWriter(path_to_save_we) as writer:
+        work_2dj.to_excel(excel_writer=writer, sheet_name='Work J', index=False, header=False)
+        work_2dev.to_excel(excel_writer=writer, sheet_name='Work eV', index=False, header=False)
+
+    with pd.ExcelWriter(path_to_save_me) as writer:
+        exp_set.to_excel(excel_writer=writer, sheet_name='Exp Setup', index=False, header=False)
+        mean_displ.to_excel(excel_writer=writer, sheet_name='mDispl cm', index=False, header=False)
+        mean_vel.to_excel(excel_writer=writer, sheet_name='mVel cms', index=False, header=False)
+        mean_acc.to_excel(excel_writer=writer, sheet_name='mAccel cms2', index=False, header=False)
+        mean_kin_en_j.to_excel(excel_writer=writer, sheet_name='mKin en J', index=False, header=False)
+        mean_kin_en_ev.to_excel(excel_writer=writer, sheet_name='mKin en eV', index=False, header=False)
+        mean_work_j.to_excel(excel_writer=writer, sheet_name='mWork J', index=False, header=False)
+        mean_work_ev.to_excel(excel_writer=writer, sheet_name='mWork eV', index=False, header=False)
+
+    print("End:", time.time() - start_time, "секунд.")
