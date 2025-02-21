@@ -1,0 +1,17 @@
+# Calculating displacements
+def calculate_displacement(coords, scale):
+    displ = coords.diff()
+    displ = displ * scale
+    displ.dropna(axis=0, inplace=True)
+    displ = displ.round(7)
+    return displ  # in [cm]
+
+
+# Calculate mean displacement of 2 axes (X and Y)
+def calculate_displacement_2d(displx, disply):
+    displ_x = displx.pow(2)
+    displ_y = disply.pow(2)
+    displ_2d = displ_x + displ_y
+    displ_2d = displ_2d.pow(0.5)
+    displ_2d = displ_2d.round(7)
+    return displ_2d
