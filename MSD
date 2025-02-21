@@ -1,0 +1,42 @@
+mport pandas as pd
+import numpy as np
+
+
+def calculate_msd(coords, indxx, colxx, scal, tickrate):
+    x1 = coords.values
+    msd = np.zeros((1, colxx))
+    means = np.zeros((1, colxx))
+    time = np.zeros((indxx, 1))
+    for i in range(indxx - 1):
+        time[i+1, 0] = 1/tickrate + i/tickrate
+        j = indxx - i - 1
+        x3 = np.full((1, colxx), j)
+        means = np.vstack([means, x3])
+        d = i+1
+        x2 = x1[d:, :] - x1[i, :]
+        x2 = x2 * scal
+        x2 = x2 ** 2
+        nulad = np.zeros((i, colxx))
+        x2 = np.vstack([x2, nulad])
+        msd = msd + x2
+    means = means[1:]
+    time = time[1:]
+    msd = msd / means
+    msd = np.hstack([time, msd])
+    msd_rez = pd.DataFrame(msd)
+    return msd_rez  # in [mkm]
+
+
+def calculate_msd_2d (msdx, msdy, indxx, tickrate):
+    x = msdx.values
+    x = x[:, 1:]
+    y = msdy.values
+    y = y[:, 1:]
+    twod = x + y
+    time = np.zeros((indxx, 1))
+    for i in range(indxx - 1):
+        time[i+1, 0] = 1/tickrate + i/tickrate
+    time = time[1:]
+    twod = np.hstack([time, twod])
+    msd_2d = pd.DataFrame(twod)
+    return msd_2d
