@@ -1,0 +1,2 @@
+def save_data(dataframe, dest, sheet, flo):
+    dataframe.to_excel(excel_writer=dest, sheet_name=sheet, index=False, header=False, float_format=flo)
