@@ -1,0 +1,16 @@
+def calculate_acceleration(velocities, indx, colx, fps):
+    accelerations = velocities.diff()
+    accelerations.dropna(axis=0, inplace=True)
+    accelerations = accelerations * fps
+    accelerations = abs(accelerations)
+    accelerations = accelerations.round(9)
+    return accelerations  # in [cm/s^2]
+
+
+def calculate_acceleration_2d(accx, accy, indx, colx):
+    acc_x = accx.pow(2)
+    acc_y = accy.pow(2)
+    acc_2d = acc_x + acc_y
+    acc_2d = acc_2d.pow(0.5)
+    acc_2d = acc_2d.round(9)
+    return acc_2d
