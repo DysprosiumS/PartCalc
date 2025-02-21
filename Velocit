@@ -1,0 +1,13 @@
+# Calculating velocities
+def calculate_velocity(displacements, indx, colx, fps):
+    velocities = displacements * fps
+    return velocities  # in [cm/s]
+
+
+# Calculate mean velocity of 2 axes (X and Y)
+def calculate_velocity_2d(velx, vely, indx, colx):
+    vel_x = velx.pow(2)
+    vel_y = vely.pow(2)
+    vel_2d = vel_x + vel_y
+    vel_2d = vel_2d.pow(0.5)
+    return vel_2d
