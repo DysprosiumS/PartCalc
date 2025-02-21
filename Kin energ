@@ -1,0 +1,9 @@
+def calculate_kin_en(velocities, dimension, indx, colx, Mass):
+    if dimension == 1:
+        kin_ens_j = velocities.pow(2)
+        kin_ens_j = kin_ens_j * (Mass * 0.5 / 10**4)
+        return kin_ens_j  # in [J]
+    if dimension == 2:
+        kin_ens_ev = velocities.pow(2)
+        kin_ens_ev = kin_ens_ev * (0.5 * Mass * (10**15)/1.6)
+        return kin_ens_ev  # in [eV]
